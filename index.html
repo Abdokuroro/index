@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantum Edge — Shared QC Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --teal: #0d9488; --teal-light: #ccfbf1;
+    --navy: #0f172a; --navy-mid: #1e293b; --navy-soft: #334155;
+    --orange: #f97316; --white: #ffffff;
+    --gray-100: #f1f5f9; --gray-200: #e2e8f0;
+    --gray-400: #94a3b8; --gray-600: #475569;
+    --green: #22c55e; --green-light: #dcfce7;
+    --red: #ef4444; --red-light: #fee2e2;
+    --yellow: #eab308; --yellow-light: #fef9c3;
+    --radius: 12px; --radius-sm: 8px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-100); color: var(--navy); min-height: 100vh; }
+  header { background: var(--navy); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--teal); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo-text { font-size: 16px; font-weight: 700; color: var(--white); }
+  .logo-sub { font-size: 11px; color: var(--gray-400); }
+  .stats-bar { display: flex; gap: 16px; }
+  .stat { text-align: center; }
+  .stat-num { font-size: 18px; font-weight: 700; color: var(--teal); }
+  .stat-label { font-size: 10px; color: var(--gray-400); }
+  main { max-width: 800px; margin: 0 auto; padding: 20px 16px; }
+  .add-section { background: var(--white); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .section-title { font-size: 14px; font-weight: 700; color: var(--navy-soft); margin-bottom: 14px; }
+  .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  input, select, textarea { border: 1.5px solid var(--gray-200); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--navy); background: var(--white); outline: none; transition: border-color 0.2s; width: 100%; }
+  input:focus, textarea:focus { border-color: var(--teal); }
+  .form-row input { flex: 1; min-width: 120px; }
+  .btn { padding: 10px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s, transform 0.1s; white-space: nowrap; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--teal); color: var(--white); }
+  .btn-danger { background: var(--red-light); color: var(--red); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--gray-200); background: var(--white); color: var(--gray-600); transition: all 0.2s; }
+  .filter-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+  .device-card { background: var(--white); border-radius: var(--radius); margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; border: 1.5px solid transparent; transition: border-color 0.2s; }
+  .device-card.ready { border-color: var(--green); }
+  .device-card.issues { border-color: var(--red); }
+  .device-card.in-progress { border-color: var(--yellow); }
+  .card-header { padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
+  .device-num { width: 36px; height: 36px; background: var(--navy); color: var(--white); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .device-info { flex: 1; }
+  .device-model { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .device-serial { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+  .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .badge-ready { background: var(--green-light); color: var(--green); }
+  .badge-issues { background: var(--red-light); color: var(--red); }
+  .badge-progress { background: var(--yellow-light); color: var(--yellow); }
+  .badge-pending { background: var(--gray-200); color: var(--gray-600); }
+  .progress-bar-wrap { height: 4px; background: var(--gray-200); margin: 0 16px; }
+  .progress-bar-fill { height: 100%; background: var(--teal); border-radius: 2px; transition: width 0.3s; }
+  .card-body { padding: 16px; border-top: 1px solid var(--gray-200); display: none; }
+  .card-body.open { display: block; }
+  .test-section { margin-bottom: 16px; }
+  .test-section-title { font-size: 12px; font-weight: 700; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--gray-200); }
+  .test-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+  .test-item:last-child { border-bottom: none; }
+  .test-controls { display: flex; gap: 6px; flex-shrink: 0; }
+  .check-btn { width: 28px; height: 28px; border-radius: 6px; border: 1.5px solid var(--gray-200); background: var(--white); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.2s; }
+  .check-btn.pass { background: var(--green-light); border-color: var(--green); }
+  .check-btn.fail { background: var(--red-light); border-color: var(--red); }
+  .test-label-wrap { flex: 1; }
+  .test-label { font-size: 13px; color: var(--navy); font-weight: 500; }
+  .test-notes { margin-top: 6px; font-size: 12px; padding: 6px 10px; background: var(--gray-100); border-radius: 6px; border: none; width: 100%; resize: none; min-height: 50px; }
+  .notes-toggle { font-size: 11px; color: var(--teal); cursor: pointer; margin-top: 4px; display: inline-block; }
+  .final-status { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .final-btn { flex: 1; padding: 10px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; text-align: center; min-width: 100px; }
+  .final-ready { background: var(--green-light); color: var(--green); border-color: var(--green-light); }
+  .final-ready.selected { border-color: var(--green); }
+  .final-repair { background: var(--red-light); color: var(--red); border-color: var(--red-light); }
+  .final-repair.selected { border-color: var(--red); }
+  .sync-bar { background: var(--navy-mid); color: var(--gray-400); font-size: 11px; text-align: center; padding: 6px; }
+  .sync-bar span { color: var(--teal); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-400); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">QUANTUM EDGE</div>
+      <div class="logo-sub">Shared QC Tracker</div>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">إجمالي</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--green)" id="stat-ready">0</div><div class="stat-label">جاهز</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--red)" id="stat-issues">0</div><div class="stat-label">مشاكل</div></div>
+  </div>
+</header>
+
+<div class="sync-bar">مشترك — كل التغييرات بتتزامن تلقائياً مع الفريق | آخر تحديث: <span id="last-sync">جاري التحميل...</span></div>
+
+<main>
+  <div class="add-section">
+    <div class="section-title">➕ إضافة جهاز جديد</div>
+    <div class="form-row">
+      <input type="text" id="input-model" placeholder="الموديل (مثال: Dell Latitude 5520)" />
+      <input type="text" id="input-serial" placeholder="رقم القطعة / السيريال" />
+    </div>
+    <div class="form-row">
+      <input type="number" id="input-qty" placeholder="عدد القطع" min="1" value="1" />
+      <button class="btn btn-primary" onclick="addDevices()">إضافة ✓</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" onclick="setFilter('all',this)">الكل</button>
+    <button class="filter-btn" onclick="setFilter('pending',this)">لم يبدأ</button>
+    <button class="filter-btn" onclick="setFilter('in-progress',this)">جاري</button>
+    <button class="filter-btn" onclick="setFilter('ready',this)">✅ جاهز</button>
+    <button class="filter-btn" onclick="setFilter('issues',this)">❌ مشاكل</button>
+  </div>
+
+  <div id="devices-list"></div>
+</main>
+
+<script>
+const TEST_SECTIONS = [
+  { title: '🔧 Hardware', tests: ['الشاشة (بقع / خطوط / ألوان)','الكيبورد (كل الأزرار)','التاتش باد','الكاميرا','الصوت (سماعات / مايك)','USB / Type-C / HDMI','SD Card Reader','WiFi / Bluetooth','البطارية (شحن / تفريغ)'] },
+  { title: '⚙️ Software & Internal', tests: ['ويندوز نظيف ومفعّل','تعريفات كاملة (Drivers)','الهارد / SSD (بدون أخطاء)','RAM (بدون أخطاء)','الفان والتبريد (درجة حرارة طبيعية)','المعالج (أداء طبيعي)','كارت الشاشة (شغال كويس)'] },
+  { title: '✨ Cosmetic', tests: ['هيكل الجهاز (خدوش / كسر)','نظافة الجهاز (داخل / خارج)','الشاحن موجود وشغال'] }
+];
+
+let devices = [], counter = 1, currentFilter = 'all';
+
+async function loadData() {
+  try {
+    const r = await window.storage.get('qe_shared_v2', true);
+    if (r && r.value) {
+      const d = JSON.parse(r.value);
+      devices = d.devices || [];
+      counter = d.counter || 1;
+    }
+  } catch(e) {}
+  document.getElementById('last-sync').textContent = new Date().toLocaleTimeString('ar-EG');
+  render();
+  updateStats();
+}
+
+async function saveData() {
+  try {
+    await window.storage.set('qe_shared_v2', JSON.stringify({ devices, counter }), true);
+    document.getElementById('last-sync').textContent = new Date().toLocaleTimeString('ar-EG');
+  } catch(e) {}
+  updateStats();
+}
+
+setInterval(async () => {
+  try {
+    const r = await window.storage.get('qe_shared_v2', true);
+    if (r && r.value) {
+      const d = JSON.parse(r.value);
+      devices = d.devices || [];
+      counter = d.counter || 1;
+      document.getElementById('last-sync').textContent = new Date().toLocaleTimeString('ar-EG');
+      render();
+      updateStats();
+    }
+  } catch(e) {}
+}, 10000);
+
+function makeFreshTests() {
+  const t = {};
+  TEST_SECTIONS.forEach(s => s.tests.forEach(name => { t[name] = { result: null, notes: '', open: false }; }));
+  return t;
+}
+
+function addDevices() {
+  const model = document.getElementById('input-model').value.trim();
+  const serial = document.getElementById('input-serial').value.trim();
+  const qty = parseInt(document.getElementById('input-qty').value) || 1;
+  if (!model) { alert('اكتب الموديل'); return; }
+  for (let i = 0; i < qty; i++) {
+    devices.push({ id: Date.now() + i, num: counter++, model, serial: serial ? (qty > 1 ? serial + '-' + (i+1) : serial) : 'QE-' + (counter-1), tests: makeFreshTests(), finalStatus: null });
+  }
+  document.getElementById('input-model').value = '';
+  document.getElementById('input-serial').value = '';
+  document.getElementById('input-qty').value = '1';
+  saveData(); render();
+}
+
+function getStatus(d) {
+  if (d.finalStatus) return d.finalStatus;
+  const all = Object.values(d.tests);
+  const done = all.filter(t => t.result !== null);
+  const failed = all.filter(t => t.result === false);
+  if (done.length === 0) return 'pending';
+  if (failed.length > 0) return 'issues';
+  if (done.length === all.length) return 'ready';
+  return 'in-progress';
+}
+
+function getProgress(d) {
+  const all = Object.values(d.tests);
+  return Math.round((all.filter(t => t.result !== null).length / all.length) * 100);
+}
+
+function setTest(deviceId, testName, result) {
+  const d = devices.find(x => x.id === deviceId); if (!d) return;
+  d.tests[testName].result = d.tests[testName].result === result ? null : result;
+  d.finalStatus = null;
+  saveData(); renderCard(deviceId);
+}
+
+function setNote(deviceId, testName, val) {
+  const d = devices.find(x => x.id === deviceId); if (!d) return;
+  d.tests[testName].notes = val;
+  saveData();
+}
+
+function toggleNotes(deviceId, testName) {
+  const d = devices.find(x => x.id === deviceId); if (!d) return;
+  d.tests[testName].open = !d.tests[testName].open;
+  saveData(); renderCard(deviceId);
+}
+
+function setFinalStatus(deviceId, status) {
+  const d = devices.find(x => x.id === deviceId); if (!d) return;
+  d.finalStatus = d.finalStatus === status ? null : status;
+  saveData(); renderCard(deviceId);
+}
+
+function deleteDevice(deviceId) {
+  if (!confirm('مسح الجهاز ده؟')) return;
+  devices = devices.filter(x => x.id !== deviceId);
+  saveData(); render();
+}
+
+function toggleCard(deviceId) {
+  const body = document.getElementById('body-' + deviceId);
+  if (body) body.classList.toggle('open');
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function getBadge(status) {
+  const map = { ready: ['badge-ready','✅ جاهز'], issues: ['badge-issues','❌ مشاكل'], 'in-progress': ['badge-progress','🔄 جاري'], pending: ['badge-pending','⏳ لم يبدأ'] };
+  const [cls, label] = map[status] || map.pending;
+  return `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+function getCardClass(status) {
+  if (status === 'ready') return 'ready';
+  if (status === 'issues') return 'issues';
+  if (status === 'in-progress') return 'in-progress';
+  return '';
+}
+
+function buildCardHTML(d) {
+  const progress = getProgress(d);
+  const status = getStatus(d);
+  let sectionsHTML = '';
+  TEST_SECTIONS.forEach(sec => {
+    let itemsHTML = '';
+    sec.tests.forEach(t => {
+      const test = d.tests[t] || { result: null, notes: '', open: false };
+      const passClass = test.result === true ? 'pass' : '';
+      const failClass = test.result === false ? 'fail' : '';
+      itemsHTML += `<div class="test-item">
+        <div class="test-controls">
+          <button class="check-btn ${passClass}" onclick="setTest(${d.id},'${t.replace(/'/g,"\\'")}',true)">✓</button>
+          <button class="check-btn ${failClass}" onclick="setTest(${d.id},'${t.replace(/'/g,"\\'")}',false)">✗</button>
+        </div>
+        <div class="test-label-wrap">
+          <div class="test-label">${t}</div>
+          <span class="notes-toggle" onclick="toggleNotes(${d.id},'${t.replace(/'/g,"\\'")}')">
+            ${test.open ? '▲ إخفاء' : '▼ ملاحظة'}
+          </span>
+          ${test.open ? `<textarea class="test-notes" placeholder="اكتب الملاحظة..." onchange="setNote(${d.id},'${t.replace(/'/g,"\\'")}',this.value)">${test.notes}</textarea>` : ''}
+        </div>
+      </div>`;
+    });
+    sectionsHTML += `<div class="test-section"><div class="test-section-title">${sec.title}</div>${itemsHTML}</div>`;
+  });
+  const readySel = status === 'ready' ? 'selected' : '';
+  const repairSel = status === 'issues' ? 'selected' : '';
+  return `<div class="device-card ${getCardClass(status)}" id="card-${d.id}">
+    <div class="card-header" onclick="toggleCard(${d.id})">
+      <div class="device-num">${d.num}</div>
+      <div class="device-info">
+        <div class="device-model">${d.model}</div>
+        <div class="device-serial">${d.serial} · ${progress}% تيست</div>
+      </div>
+      ${getBadge(status)}
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
+    <div class="card-body" id="body-${d.id}">
+      ${sectionsHTML}
+      <div class="final-status">
+        <button class="final-btn final-ready ${readySel}" onclick="setFinalStatus(${d.id},'ready')">✅ جاهز للبيع</button>
+        <button class="final-btn final-repair ${repairSel}" onclick="setFinalStatus(${d.id},'issues')">🔧 محتاج صيانة</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDevice(${d.id})">حذف</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCard(id) {
+  const d = devices.find(x => x.id === id);
+  if (!d) return;
+  const el = document.getElementById('card-' + id);
+  if (!el) { render(); return; }
+  const wasOpen = document.getElementById('body-' + id)?.classList.contains('open');
+  el.outerHTML = buildCardHTML(d);
+  if (wasOpen) { document.getElementById('body-' + id)?.classList.add('open'); }
+}
+
+function render() {
+  const list = document.getElementById('devices-list');
+  let filtered = devices;
+  if (currentFilter !== 'all') filtered = devices.filter(d => getStatus(d) === currentFilter);
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">💻</div><div>${currentFilter === 'all' ? 'ابدأ بإضافة الأجهزة' : 'مفيش أجهزة في الفلتر ده'}</div></div>`;
+  } else {
+    list.innerHTML = filtered.map(buildCardHTML).join('');
+  }
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = devices.length;
+  document.getElementById('stat-ready').textContent = devices.filter(d => getStatus(d) === 'ready').length;
+  document.getElementById('stat-issues').textContent = devices.filter(d => getStatus(d) === 'issues').length;
+}
+
+loadData();
+</script>
+</body>
+</html>
